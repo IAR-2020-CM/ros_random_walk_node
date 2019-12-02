@@ -3,11 +3,13 @@ import rospy
 from std_msgs.msg import String
 from geometry_msgs.msg import Twist
 from sensor_msgs.msg import LaserScan
+from kobuki_msgs.msg import BumperEvent
 import numpy as np
 import math
 import random
 
 dist = []
+bumpers = set()
 
 def random_sign():
     if random.random() < 0.5:
@@ -31,6 +33,13 @@ def camera_callback(msg):
     if len(scan) != 0:
         dist = scan
 
+def bumper_callback(msg):
+    global bumpers
+    if msg.state == 1:
+        bumpers.add(msg.bumper)
+    else:
+        bumpers.remove(msg.bumper)
+
 def autonomous_move():
     global dist
 
@@ -38,6 +47,7 @@ def autonomous_move():
     pub = rospy.Publisher('/cmd_vel_mux/input/teleop', Twist)
 
     rospy.Subscriber('/scan', LaserScan, camera_callback)
+    rospy.Subscriber('/mobile_base/events/bumper', BumperEvent, bumper_callback)
 
     r = rospy.Rate(10)
     obstacle = False
@@ -51,8 +61,12 @@ def autonomous_move():
             if not obstacle:
                 angular = random_sign()
             obstacle = True
-        else:
+        elif len(bumpers) == 0:
             linear = -0.1
+            angular = 0
+            obstacle = False
+        if len(bumpers) != 0:
+            linear = 0
             angular = 0
             obstacle = False
 
